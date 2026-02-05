@@ -62,7 +62,27 @@ export default function SignupClientScreen() {
             return;
         }
 
+        // 0. Verify CPF Uniqueness
         setLoading(true);
+
+        const { data: existingAcesso, error: cpfCheckError } = await supabase
+            .from('acesso')
+            .select('login')
+            .eq('CPF', cpf)
+            .maybeSingle();
+
+        if (cpfCheckError) {
+            console.error('Error checking CPF:', cpfCheckError);
+            Alert.alert('Erro', 'Falha ao verificar CPF.');
+            setLoading(false);
+            return;
+        }
+
+        if (existingAcesso) {
+            Alert.alert('Erro', 'CPF já cadastrado no sistema.');
+            setLoading(false);
+            return;
+        }
 
         const { data: acessoData, error: acessoError } = await supabase
             .from('acesso')

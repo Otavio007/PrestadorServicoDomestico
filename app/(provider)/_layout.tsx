@@ -1,7 +1,10 @@
 import { Tabs } from 'expo-router';
 import { Calendar, MessageSquare, User } from 'lucide-react-native';
+import { useUnread } from '../../context/UnreadContext';
 
 export default function ProviderLayout() {
+    const { unreadCount } = useUnread();
+
     return (
         <Tabs
             screenOptions={{
@@ -37,6 +40,7 @@ export default function ProviderLayout() {
                 options={{
                     title: 'Mensagens',
                     tabBarIcon: ({ color }) => <MessageSquare color={color} size={24} />,
+                    tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
                 }}
             />
             <Tabs.Screen

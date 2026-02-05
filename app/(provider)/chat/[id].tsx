@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Image as ImageIcon, Send } from 'lucide-react-native';
+import { ArrowLeft, Send } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Image, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useUnread } from '../../../context/UnreadContext';
 import { supabase } from '../../../lib/supabase';
 
 interface Message {
@@ -25,6 +25,7 @@ export default function ProviderChatDetailScreen() {
     const [clientName, setClientName] = useState('Cliente');
     const [clientImage, setClientImage] = useState<string | null>(null);
     const flatListRef = useRef<FlatList>(null);
+    const { refreshUnreadCount } = useUnread();
 
     useEffect(() => {
         loadData();
@@ -61,6 +62,9 @@ export default function ProviderChatDetailScreen() {
             .single();
         if (cData) setClientName(cData.nome);
 
+        // Mark messages as read
+        markMessagesAsRead(id);
+
         // Fetch profile image
         const { data: imgData } = await supabase
             .from('imagem_perfil')
@@ -85,6 +89,22 @@ export default function ProviderChatDetailScreen() {
         }
     }
 
+    async function markMessagesAsRead(providerId: string) {
+        if (!clientId || !providerId) return;
+
+        const { error } = await supabase
+            .from('mensagem')
+            .update({ lida: true })
+            .eq('id_cliente', clientId)
+            .eq('id_prestador', providerId)
+            .eq('enviado_por', 'cliente') // Messages sent by client
+            .eq('lida', false);
+
+        if (!error) {
+            refreshUnreadCount();
+        }
+    }
+
     function subscribeToMessages(currentUserId: string) {
         return supabase
             .channel('public:mensagem')
@@ -99,6 +119,9 @@ export default function ProviderChatDetailScreen() {
                         if (prev.some(m => m.id_mensagem === newMessage.id_mensagem)) return prev;
                         return [...prev, { ...newMessage, sent_by_me: false }];
                     });
+
+                    // Mark this new message as read immediately if I'm viewing the chat
+                    markMessagesAsRead(currentUserId);
                 }
             })
             .subscribe();
@@ -138,15 +161,6 @@ export default function ProviderChatDetailScreen() {
         }
     }
 
-    const pickImage = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 1,
-        });
-        if (!result.canceled) {
-            Alert.alert('Funcionalidade em breve');
-        }
-    };
 
     const renderMessage = ({ item }: { item: Message }) => {
         const isMe = item.sent_by_me;
@@ -193,9 +207,6 @@ export default function ProviderChatDetailScreen() {
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
             >
                 <View style={styles.inputContainer}>
-                    <TouchableOpacity style={styles.attachButton} onPress={pickImage}>
-                        <ImageIcon color="#6B7280" size={24} />
-                    </TouchableOpacity>
 
                     <TextInput
                         style={styles.input}
@@ -269,7 +280,6 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#E5E7EB',
     },
-    attachButton: { padding: 8 },
     input: {
         flex: 1,
         backgroundColor: '#F3F4F6',

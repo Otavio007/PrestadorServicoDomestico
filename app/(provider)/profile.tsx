@@ -34,7 +34,7 @@ export default function ProviderProfileScreen() {
     const [servicesList, setServicesList] = useState<SearchableSelectItem[]>([]);
     const [citiesList, setCitiesList] = useState<SearchableSelectItem[]>([]);
 
-    const [selectedService, setSelectedService] = useState<number | null>(null);
+    const [selectedServices, setSelectedServices] = useState<number[]>([]);
     const [selectedCities, setSelectedCities] = useState<number[]>([]);
 
     // Loading State
@@ -107,15 +107,14 @@ export default function ProviderProfileScreen() {
                 // If column missing, it will just be undefined.
             }
 
-            // 3. Fetch Selected Service
+            // 3. Fetch Selected Services
             const { data: serviceData } = await supabase
                 .from('servico_prestador')
                 .select('id_servico')
-                .eq('id_prestador', userId)
-                .single();
+                .eq('id_prestador', userId);
 
             if (serviceData) {
-                setSelectedService(serviceData.id_servico);
+                setSelectedServices(serviceData.map((s: any) => s.id_servico));
             }
 
             // 4. Fetch Selected Cities
@@ -232,15 +231,17 @@ export default function ProviderProfileScreen() {
                 // We don't necessarily throw here if the prestador update worked, but it's good to know
             }
 
-            // 2. Update Service
-            if (selectedService) {
-                // Delete old and insert new, or just upsert if schema allows
-                // Since it's a 1-to-1 main service usually, we can delete previous ones for this provider
+            // 2. Update Services
+            if (selectedServices.length > 0) {
+                // Delete old and insert new
                 await supabase.from('servico_prestador').delete().eq('id_prestador', currentUserId);
-                await supabase.from('servico_prestador').insert({
+
+                const serviceInserts = selectedServices.map(serviceId => ({
                     id_prestador: currentUserId,
-                    id_servico: selectedService
-                });
+                    id_servico: serviceId
+                }));
+
+                await supabase.from('servico_prestador').insert(serviceInserts);
             }
 
             // 3. Update Cities of Operation
@@ -297,7 +298,9 @@ export default function ProviderProfileScreen() {
     }
 
     // Determine Role Label for UI
-    const currentServiceLabel = servicesList.find(s => s.value === selectedService)?.label || 'Prestador';
+    const currentServiceLabel = selectedServices.length > 0
+        ? servicesList.filter(s => selectedServices.includes(s.value as number)).map(s => s.label).join(', ')
+        : 'Prestador';
 
     const handleLogout = async () => {
         await AsyncStorage.removeItem('user_id');
@@ -338,6 +341,15 @@ export default function ProviderProfileScreen() {
                         textAlign="center"
                     />
                     <Text style={styles.userRole}>{currentServiceLabel}</Text>
+
+                    {/* Save Button (Moved here) */}
+                    <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+                        {saving ? (
+                            <Text style={styles.saveButtonText}>Salvando...</Text>
+                        ) : (
+                            <Text style={styles.saveButtonText}>Salvar Alterações</Text>
+                        )}
+                    </TouchableOpacity>
                 </View>
 
                 {/* 2. About Section */}
@@ -371,10 +383,11 @@ export default function ProviderProfileScreen() {
                     <Text style={styles.sectionTitle}>Serviço e Atuação</Text>
                     <SearchableSelect
                         items={servicesList}
-                        selectedValue={selectedService!}
-                        onSelectionChange={setSelectedService}
-                        placeholder="Selecione..."
-                        title="Serviço Principal"
+                        selectedValues={selectedServices}
+                        onSelectionChange={setSelectedServices}
+                        multiSelect={true}
+                        placeholder="Selecione os serviços..."
+                        title="Serviços"
                     />
                     <View style={{ height: 16 }} />
                     <SearchableSelect
@@ -449,13 +462,6 @@ export default function ProviderProfileScreen() {
                 </View>
 
                 {/* Save Button */}
-                <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-                    {saving ? (
-                        <Text style={styles.saveButtonText}>Salvando...</Text>
-                    ) : (
-                        <Text style={styles.saveButtonText}>Salvar Alterações</Text>
-                    )}
-                </TouchableOpacity>
 
                 {/* Logout Button */}
                 <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -507,8 +513,8 @@ const styles = StyleSheet.create({
     modernPortfolioImage: { width: 120, height: 160, borderRadius: 16, resizeMode: 'cover', backgroundColor: '#E5E7EB' },
 
     // Save Button
-    saveButton: { backgroundColor: '#4F46E5', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 10, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-    saveButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+    saveButton: { backgroundColor: '#4F46E5', paddingVertical: 12, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center', marginTop: 16, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4, width: '100%', maxWidth: 300 },
+    saveButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
 
     // Logout
     logoutButton: {

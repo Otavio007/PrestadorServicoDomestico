@@ -24,7 +24,7 @@ export default function SignupPrestadorScreen() {
     const [cities, setCities] = useState<SearchableSelectItem[]>([]);
 
     // Selections
-    const [selectedService, setSelectedService] = useState<number | string | null>(null);
+    const [selectedServices, setSelectedServices] = useState<(number | string)[]>([]);
     const [selectedCities, setSelectedCities] = useState<(number | string)[]>([]); // Array of City IDs
     const [selectedCity, setSelectedCity] = useState<number | string | null>(null);
 
@@ -79,14 +79,30 @@ export default function SignupPrestadorScreen() {
     }
 
     async function handleSignup() {
-        if (!email || !password || !name || !cpf || !selectedService) {
-            Alert.alert('Erro', 'Por favor preencha os campos obrigatórios e selecione um serviço.');
+        if (!email || !password || !name || !cpf || selectedServices.length === 0) {
+            Alert.alert('Erro', 'Por favor preencha os campos obrigatórios e selecione pelo menos um serviço.');
             return;
         }
 
         setLoading(true);
 
         try {
+            // 0. Verify CPF Uniqueness
+            const { data: existingAcesso, error: cpfCheckError } = await supabase
+                .from('acesso')
+                .select('login')
+                .eq('CPF', cpf)
+                .maybeSingle();
+
+            if (cpfCheckError) {
+                console.error('Error checking CPF:', cpfCheckError);
+                throw new Error('Falha ao verificar CPF.');
+            }
+
+            if (existingAcesso) {
+                throw new Error('CPF já cadastrado no sistema.');
+            }
+
             // 1. Insert into 'acesso' table and get Login ID
             const { data: acessoData, error: acessoError } = await supabase
                 .from('acesso')
@@ -122,15 +138,18 @@ export default function SignupPrestadorScreen() {
             if (prestadorError) throw new Error(`Erro no prestador: ${prestadorError.message}`);
 
             // 3. Insert into 'servico_prestador' table
-            // Only strictly requested mapping: id_prestador + id_servico
-            const { error: servicoError } = await supabase
-                .from('servico_prestador')
-                .insert({
+            if (selectedServices.length > 0) {
+                const serviceInserts = selectedServices.map(serviceId => ({
                     id_prestador: loginId,
-                    id_servico: selectedService
-                });
+                    id_servico: serviceId
+                }));
 
-            if (servicoError) throw new Error(`Erro ao vincular serviço: ${servicoError.message}`);
+                const { error: servicoError } = await supabase
+                    .from('servico_prestador')
+                    .insert(serviceInserts);
+
+                if (servicoError) throw new Error(`Erro ao vincular serviços: ${servicoError.message}`);
+            }
 
             // 4. Insert Selected Cities into 'cidade_atuacao'
             // User requested: for each selected city, perform an insert
@@ -295,11 +314,12 @@ export default function SignupPrestadorScreen() {
 
                             <View style={{ marginBottom: 12 }}>
                                 <SearchableSelect
-                                    title="Selecione o Serviço"
-                                    placeholder="Selecione um serviço..."
+                                    title="Selecione os Serviços"
+                                    placeholder="Selecione um ou mais serviços..."
                                     items={services}
-                                    selectedValue={selectedService!}
-                                    onSelectionChange={setSelectedService}
+                                    selectedValues={selectedServices}
+                                    onSelectionChange={setSelectedServices}
+                                    multiSelect={true}
                                     icon={<Briefcase color={Palette.icon} size={20} />}
                                 />
                             </View>

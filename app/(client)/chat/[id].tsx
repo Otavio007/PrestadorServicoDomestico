@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import * as DocumentPicker from 'expo-document-picker'; // Removed due to installation issues
-import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, File, Image as ImageIcon, Send } from 'lucide-react-native';
+import { ArrowLeft, Send } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Image, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useUnread } from '../../../context/UnreadContext';
 import { supabase } from '../../../lib/supabase';
 
 interface Message {
@@ -26,6 +26,7 @@ export default function ChatDetailScreen() {
     const [providerName, setProviderName] = useState('Conversa');
     const [providerImage, setProviderImage] = useState<string | null>(null);
     const flatListRef = useRef<FlatList>(null);
+    const { refreshUnreadCount } = useUnread();
 
     useEffect(() => {
         loadData();
@@ -62,6 +63,9 @@ export default function ChatDetailScreen() {
             .single();
         if (pData) setProviderName(pData.nome);
 
+        // Mark messages as read
+        markMessagesAsRead(id);
+
         // Fetch profile image
         const { data: imgData } = await supabase
             .from('imagem_perfil')
@@ -86,6 +90,22 @@ export default function ChatDetailScreen() {
         }
     }
 
+    async function markMessagesAsRead(clientId: string) {
+        if (!clientId || !providerId) return;
+
+        const { error } = await supabase
+            .from('mensagem')
+            .update({ lida: true })
+            .eq('id_cliente', clientId)
+            .eq('id_prestador', providerId)
+            .eq('enviado_por', 'prestador') // Messages sent by provider
+            .eq('lida', false);
+
+        if (!error) {
+            refreshUnreadCount();
+        }
+    }
+
     function subscribeToMessages(currentUserId: string) {
         return supabase
             .channel('public:mensagem')
@@ -100,6 +120,9 @@ export default function ChatDetailScreen() {
                         if (prev.some(m => m.id_mensagem === newMessage.id_mensagem)) return prev;
                         return [...prev, { ...newMessage, sent_by_me: false }];
                     });
+
+                    // Mark this new message as read immediately if I'm viewing the chat
+                    markMessagesAsRead(currentUserId);
                 }
             })
             .subscribe();
@@ -142,24 +165,6 @@ export default function ChatDetailScreen() {
         }
     }
 
-    const pickImage = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: 1,
-        });
-        if (!result.canceled) {
-            // Logic to upload to Supabase Storage and send URL in text
-            alert('Funcionalidade de upload de imagem em breve!');
-        }
-    };
-
-    const pickDocument = async () => {
-        // const result = await DocumentPicker.getDocumentAsync();
-        // if (result.type === 'success') {
-        //     alert('Funcionalidade de upload de documento em breve!');
-        // }
-        alert('Funcionalidade de documento requer a biblioteca "expo-document-picker".');
-    };
 
     const renderMessage = ({ item }: { item: Message }) => {
         const isMe = item.sent_by_me;
@@ -207,12 +212,6 @@ export default function ChatDetailScreen() {
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
             >
                 <View style={styles.inputContainer}>
-                    <TouchableOpacity style={styles.attachButton} onPress={pickImage}>
-                        <ImageIcon color="#6B7280" size={24} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.attachButton} onPress={pickDocument}>
-                        <File color="#6B7280" size={24} />
-                    </TouchableOpacity>
 
                     <TextInput
                         style={styles.input}
@@ -286,7 +285,6 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#E5E7EB',
     },
-    attachButton: { padding: 8 },
     input: {
         flex: 1,
         backgroundColor: '#F3F4F6',
