@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Calendar, MessageSquare, User } from 'lucide-react-native';
+import { Calendar, MessageSquare, Star, User } from 'lucide-react-native';
 import { useUnread } from '../../context/UnreadContext';
 
 export default function ProviderLayout() {
@@ -48,6 +48,13 @@ export default function ProviderLayout() {
                 options={{
                     title: 'Agenda',
                     tabBarIcon: ({ color }) => <Calendar color={color} size={24} />,
+                }}
+            />
+            <Tabs.Screen
+                name="reviews"
+                options={{
+                    title: 'Avaliações',
+                    tabBarIcon: ({ color }) => <Star color={color} size={24} />,
                 }}
             />
             <Tabs.Screen
