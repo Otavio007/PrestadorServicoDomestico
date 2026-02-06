@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { MessageSquare, Search } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
@@ -12,6 +12,7 @@ interface ChatItem {
     last_message: string;
     time: string;
     avatar: string | null;
+    unread_count: number;
 }
 
 export default function ProviderChatsScreen() {
@@ -29,6 +30,14 @@ export default function ProviderChatsScreen() {
         setUserId(id);
         if (id) fetchChats(id);
     }
+
+    useFocusEffect(
+        useCallback(() => {
+            if (userId) {
+                fetchChats(userId);
+            }
+        }, [userId])
+    );
 
     async function fetchChats(providerId: string) {
         try {
@@ -69,6 +78,19 @@ export default function ProviderChatsScreen() {
                     return acc;
                 }, {});
 
+                // 3.6 Fetch Unread Counts per Client
+                const { data: unreadData } = await supabase
+                    .from('mensagem')
+                    .select('id_cliente')
+                    .eq('id_prestador', providerId)
+                    .eq('enviado_por', 'cliente')
+                    .eq('lida', false);
+
+                const unreadMap = (unreadData || []).reduce((acc: any, curr: any) => {
+                    acc[curr.id_cliente] = (acc[curr.id_cliente] || 0) + 1;
+                    return acc;
+                }, {});
+
                 // 4. Aggregate by client to show latest message
                 const uniqueChats: Record<string, ChatItem> = {};
                 messagesData.forEach((m: any) => {
@@ -78,7 +100,8 @@ export default function ProviderChatsScreen() {
                             client_name: clientMap[m.id_cliente] || 'Cliente',
                             last_message: m.texto || 'Anexo',
                             time: new Date(m.data_mensagem).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false }),
-                            avatar: imageMap[m.id_cliente] || null
+                            avatar: imageMap[m.id_cliente] || null,
+                            unread_count: unreadMap[m.id_cliente] || 0
                         };
                     }
                 });
@@ -110,6 +133,11 @@ export default function ProviderChatsScreen() {
                 </View>
                 <Text style={styles.lastMessage} numberOfLines={1}>{item.last_message}</Text>
             </View>
+            {item.unread_count > 0 && (
+                <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{item.unread_count}</Text>
+                </View>
+            )}
         </TouchableOpacity>
     );
 
@@ -210,4 +238,19 @@ const styles = StyleSheet.create({
     lastMessage: { fontSize: 14, color: '#6B7280' },
     emptyContainer: { alignItems: 'center', marginTop: 100 },
     emptyText: { marginTop: 12, fontSize: 16, color: '#9CA3AF' },
+    unreadBadge: {
+        backgroundColor: '#4F46E5',
+        minWidth: 20,
+        height: 20,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        marginLeft: 8,
+    },
+    unreadBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
 });

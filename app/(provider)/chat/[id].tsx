@@ -29,10 +29,10 @@ export default function ProviderChatDetailScreen() {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [clientId]);
 
     useEffect(() => {
-        if (!userId) return;
+        if (!userId || !clientId) return;
 
         const subscription = subscribeToMessages(userId);
 
@@ -45,7 +45,7 @@ export default function ProviderChatDetailScreen() {
             subscription.unsubscribe();
             clearInterval(interval);
         };
-    }, [userId]);
+    }, [userId, clientId]);
 
     async function loadData() {
         const id = await AsyncStorage.getItem('user_id');
@@ -181,7 +181,7 @@ export default function ProviderChatDetailScreen() {
             <StatusBar barStyle="dark-content" />
 
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                <TouchableOpacity onPress={() => router.replace('/(provider)/chats')} style={styles.backButton}>
                     <ArrowLeft color="#1F2937" size={24} />
                 </TouchableOpacity>
                 <View style={styles.headerInfo}>

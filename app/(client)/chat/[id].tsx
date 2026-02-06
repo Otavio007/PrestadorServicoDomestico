@@ -30,10 +30,10 @@ export default function ChatDetailScreen() {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [providerId]);
 
     useEffect(() => {
-        if (!userId) return;
+        if (!userId || !providerId) return;
 
         const subscription = subscribeToMessages(userId);
 
@@ -46,7 +46,7 @@ export default function ChatDetailScreen() {
             subscription.unsubscribe();
             clearInterval(interval);
         };
-    }, [userId]);
+    }, [userId, providerId]);
 
     async function loadData() {
         const id = await AsyncStorage.getItem('user_id');
@@ -186,7 +186,7 @@ export default function ChatDetailScreen() {
 
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                <TouchableOpacity onPress={() => router.replace('/(client)/chats')} style={styles.backButton}>
                     <ArrowLeft color="#1F2937" size={24} />
                 </TouchableOpacity>
                 <View style={styles.headerInfo}>

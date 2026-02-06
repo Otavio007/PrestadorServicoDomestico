@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { Camera, LogOut, Plus } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchableSelect, SearchableSelectItem } from '../../components/SearchableSelect';
 import { supabase } from '../../lib/supabase';
@@ -42,6 +42,7 @@ export default function ProviderProfileScreen() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [selectedCity, setSelectedCity] = useState<number | null>(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     useEffect(() => {
         fetchProfileData();
@@ -93,18 +94,10 @@ export default function ProviderProfileScreen() {
                 setZip(providerData.cep || '');
                 setState(providerData.uf || '');
                 setSelectedCity(providerData.id_cidade || null);
-                // Note: signup-prestador inserted 'logradouro', 'num_logradouro', 'bairro' etc.
-                // Let's verify mapping: 'logradouro'->street, 'num_logradouro'->number.
-                // Checking previous files, signup used 'num_logradouro'.
-                // I will assume standard naming or check carefully.
-                // In signup-prestador.tsx, it inserts: { nome, email, cpf_cnpj, fone1, logradouro: street, num_logradouro: number, bairro: district, cep, ... }
-                // So I will map correctly.
                 setStreet(providerData.logradouro || '');
                 setNumber(providerData.num_logradouro || '');
                 setDistrict(providerData.bairro || '');
-                setZip(providerData.cep || '');
-                // 'uf' or 'estado' wasn't explicitly mentioned in signup insert in the summaries, but common.
-                // If column missing, it will just be undefined.
+                setZip(providerData.cep ? String(providerData.cep) : '');
             }
 
             // 3. Fetch Selected Services
@@ -194,95 +187,117 @@ export default function ProviderProfileScreen() {
     };
 
     async function handleSave() {
-        if (!currentUserId) return;
+        if (!currentUserId) {
+            Alert.alert('Erro', 'Usuário não identificado. Por favor, faça login novamente.');
+            return;
+        }
 
         try {
             setSaving(true);
+            console.log('Iniciando salvamento completo do perfil...');
 
             // 1. Update Provider Basic Info & Address
-            const { error: pError } = await supabase
+            // CEP in DB is bigint, CPF/Phone are limited length strings
+            const numericZip = zip ? parseInt(zip.replace(/\D/g, ''), 10) : null;
+            const cleanedCpf = cpf ? cpf.replace(/\D/g, '').substring(0, 14) : '';
+            const cleanedPhone = phone ? phone.replace(/\D/g, '').substring(0, 11) : '';
+
+            console.log('Dados formatados para envio:', {
+                nome: name,
+                fone1: cleanedPhone,
+                email: email,
+                cpf_cnpj: cleanedCpf,
+                texto_meuperfil: (description || '').trim(),
+                cep: numericZip,
+                id_cidade: selectedCity,
+                uf: state
+            });
+
+            const { error: pError, count } = await supabase
                 .from('prestador')
                 .update({
                     nome: name,
-                    fone1: phone,
+                    fone1: cleanedPhone,
                     email: email,
-                    cpf_cnpj: cpf,
-                    texto_meuperfil: description,
+                    cpf_cnpj: cleanedCpf,
+                    texto_meuperfil: (description || '').trim(),
                     logradouro: street,
-                    num_logradouro: number || null, // Ensure empty string becomes null
+                    num_logradouro: number || null,
                     bairro: district,
-                    cep: zip ? parseInt(zip.replace(/\D/g, ''), 10) : null, // Convert to bigint/int
+                    cep: numericZip,
                     id_cidade: selectedCity,
-                })
+                    uf: state,
+                }, { count: 'exact' })
                 .eq('id_prestador', currentUserId);
 
-            if (pError) throw pError;
+            if (pError) {
+                console.error('Database Update Error:', pError);
+                throw new Error(`Erro nos dados básicos: [${pError.code}] ${pError.message}`);
+            }
+
+            if (count === 0) {
+                console.warn('Nenhum registro atualizado. ID do prestador não encontrado:', currentUserId);
+                throw new Error('Nenhum dado foi alterado. Verifique se seu perfil existe ou tente logar novamente.');
+            }
+
+            console.log('Update de dados básicos realizado com sucesso! Linhas afetadas:', count);
 
             // 1.5. Update Login Info (CPF) in 'acesso' table
             const { error: aError } = await supabase
                 .from('acesso')
-                .update({
-                    CPF: cpf
-                })
+                .update({ CPF: cpf })
                 .eq('login', currentUserId);
 
-            if (aError) {
-                console.warn('Error updating login info:', aError);
-                // We don't necessarily throw here if the prestador update worked, but it's good to know
-            }
+            if (aError) console.warn('Erro ao sincronizar CPF no acesso:', aError);
 
-            // 2. Update Services
+            // 2. Update Services (Always clear and re-insert if needed)
+            await supabase.from('servico_prestador').delete().eq('id_prestador', currentUserId);
             if (selectedServices.length > 0) {
-                // Delete old and insert new
-                await supabase.from('servico_prestador').delete().eq('id_prestador', currentUserId);
-
                 const serviceInserts = selectedServices.map(serviceId => ({
                     id_prestador: currentUserId,
                     id_servico: serviceId
                 }));
-
-                await supabase.from('servico_prestador').insert(serviceInserts);
+                const { error: sError } = await supabase.from('servico_prestador').insert(serviceInserts);
+                if (sError) throw new Error(`Erro ao salvar serviços: ${sError.message}`);
             }
 
-            // 3. Update Cities of Operation
+            // 3. Update Cities of Operation (Always clear and re-insert if needed)
+            await supabase.from('cidade_atuacao').delete().eq('id_prestador', currentUserId);
             if (selectedCities.length > 0) {
-                await supabase.from('cidade_atuacao').delete().eq('id_prestador', currentUserId);
                 const cityInserts = selectedCities.map(cityId => ({
                     id_prestador: currentUserId,
                     id_cidade: cityId
                 }));
-                await supabase.from('cidade_atuacao').insert(cityInserts);
+                const { error: cError } = await supabase.from('cidade_atuacao').insert(cityInserts);
+                if (cError) throw new Error(`Erro ao salvar cidades: ${cError.message}`);
             }
 
             // 4. Update Portfolio Images
-            // Simple sync: delete existing for this provider and insert current list
             await supabase.from('imagem_portfolio').delete().eq('id_prestador', currentUserId);
-
             if (portfolioImages.length > 0) {
                 const portfolioInserts = portfolioImages.map(imgUri => ({
-                    id_imagem: Date.now() + Math.floor(Math.random() * 1000), // Random ID approach as bigint
+                    id_imagem: Date.now() + Math.floor(Math.random() * 100000),
                     id_prestador: currentUserId,
                     imagem: imgUri,
                 }));
                 const { error: portfolioError } = await supabase.from('imagem_portfolio').insert(portfolioInserts);
-                if (portfolioError) throw portfolioError;
+                if (portfolioError) throw new Error(`Erro ao salvar portfólio: ${portfolioError.message}`);
             }
 
             // 5. Update Profile Image
             if (profileImage) {
-                // Delete old and insert new (or upsert if possible)
                 await supabase.from('imagem_perfil').delete().eq('id_usuario', currentUserId);
                 const { error: imgError } = await supabase.from('imagem_perfil').insert({
                     id_usuario: currentUserId,
                     img: profileImage
                 });
-                if (imgError) throw imgError;
+                if (imgError) throw new Error(`Erro ao salvar foto de perfil: ${imgError.message}`);
             }
 
-            Alert.alert('Sucesso', 'Perfil atualizado com sucesso!');
+            setShowSuccessModal(true);
         } catch (error: any) {
-            console.error('Error saving profile:', error);
-            Alert.alert('Erro', 'Falha ao salvar alterações: ' + error.message);
+            console.error('Erro crítico no salvamento:', error);
+            Alert.alert('Erro ao Salvar', error.message || 'Ocorreu um erro inesperado.');
         } finally {
             setSaving(false);
         }
@@ -342,14 +357,16 @@ export default function ProviderProfileScreen() {
                     />
                     <Text style={styles.userRole}>{currentServiceLabel}</Text>
 
-                    {/* Save Button (Moved here) */}
-                    <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-                        {saving ? (
-                            <Text style={styles.saveButtonText}>Salvando...</Text>
-                        ) : (
-                            <Text style={styles.saveButtonText}>Salvar Alterações</Text>
-                        )}
+                    <TouchableOpacity
+                        style={styles.saveButton}
+                        onPress={handleSave}
+                        disabled={saving}
+                    >
+                        <Text style={styles.saveButtonText}>
+                            {saving ? 'Salvando...' : 'Salvar Alterações'}
+                        </Text>
                     </TouchableOpacity>
+
                 </View>
 
                 {/* 2. About Section */}
@@ -469,7 +486,34 @@ export default function ProviderProfileScreen() {
                     <Text style={styles.logoutText}>Sair da Conta</Text>
                 </TouchableOpacity>
 
+
             </ScrollView>
+
+            {/* Success Modal */}
+            <Modal
+                visible={showSuccessModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowSuccessModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.successCard}>
+                        <View style={styles.successIconContainer}>
+                            <Text style={{ fontSize: 40 }}>🎉</Text>
+                        </View>
+                        <Text style={styles.successTitle}>Sucesso!</Text>
+                        <Text style={styles.successMessage}>
+                            Seus dados foram atualizados com sucesso!
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.modalButton}
+                            onPress={() => setShowSuccessModal(false)}
+                        >
+                            <Text style={styles.modalButtonText}>Entendido</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -529,4 +573,61 @@ const styles = StyleSheet.create({
         marginTop: 16,
     },
     logoutText: { color: '#EF4444', fontSize: 16, fontWeight: '600' },
+
+    // Success Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20
+    },
+    successCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 24,
+        padding: 32,
+        alignItems: 'center',
+        width: '100%',
+        maxWidth: 340,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 10
+    },
+    successIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#F0FDF4',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 20
+    },
+    successTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#111827',
+        marginBottom: 12
+    },
+    successMessage: {
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 24
+    },
+    modalButton: {
+        backgroundColor: '#4F46E5',
+        paddingVertical: 14,
+        paddingHorizontal: 32,
+        borderRadius: 12,
+        width: '100%',
+        alignItems: 'center'
+    },
+    modalButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold'
+    }
 });

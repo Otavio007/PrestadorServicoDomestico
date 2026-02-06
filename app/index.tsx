@@ -53,11 +53,13 @@ export default function LoginScreen() {
             if (userType === 'prestador' || userType === 'prestador de serviço') {
                 if (data.login) {
                     await AsyncStorage.setItem('user_id', String(data.login));
+                    await AsyncStorage.setItem('user_type', 'prestador');
                 }
                 router.replace('/(provider)/profile');
             } else if (userType === 'cliente' || userType === 'client') {
                 if (data.login) {
                     await AsyncStorage.setItem('user_id', String(data.login));
+                    await AsyncStorage.setItem('user_type', 'cliente');
                 }
                 router.replace('/(client)/home');
             } else {

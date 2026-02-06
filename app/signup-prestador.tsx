@@ -175,6 +175,7 @@ export default function SignupPrestadorScreen() {
 
             // Save session ID for auto-login behavior
             await AsyncStorage.setItem('user_id', String(loginId));
+            await AsyncStorage.setItem('user_type', 'prestador');
 
             Alert.alert('Sucesso!', 'Cadastro realizado com sucesso.');
             router.replace('/(provider)/profile');

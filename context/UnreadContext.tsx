@@ -17,19 +17,35 @@ export const UnreadProvider = ({ children }: { children: React.ReactNode }) => {
 
     const refreshUnreadCount = async () => {
         try {
-            const userId = await AsyncStorage.getItem('user_id');
-            const userType = await AsyncStorage.getItem('user_type'); // 'cliente' or 'prestador'
+            let userId = await AsyncStorage.getItem('user_id');
+            let userType = await AsyncStorage.getItem('user_type'); // 'cliente' or 'prestador'
 
-            if (!userId || !userType) return;
+            if (!userId) return;
+
+            // If userType is missing, try to fetch it from the database once
+            if (!userType) {
+                const { data: accessData } = await supabase
+                    .from('acesso')
+                    .select('tipo_login')
+                    .eq('login', userId)
+                    .single();
+
+                if (accessData) {
+                    const type = accessData.tipo_login?.toLowerCase();
+                    if (type === 'prestador' || type === 'prestador de serviço') {
+                        userType = 'prestador';
+                    } else if (type === 'cliente' || type === 'client') {
+                        userType = 'cliente';
+                    }
+                    if (userType) {
+                        await AsyncStorage.setItem('user_type', userType);
+                    }
+                }
+            }
+
+            if (!userType) return;
 
             // Determine if the user is receiving messages as a client (from provider) or as a provider (from client)
-            // If I am a client, I want to count messages sent by 'prestador' that are not read.
-            // If I am a provider, I want to count messages sent by 'cliente' that are not read.
-
-            // The 'enviado_por' field helps us. 
-            // If userType === 'cliente', we look for messages where id_cliente === userId AND enviado_por === 'prestador' AND lida === false
-            // If userType === 'prestador', we look for messages where id_prestador === userId AND enviado_por === 'cliente' AND lida === false
-
             let query = supabase
                 .from('mensagem')
                 .select('*', { count: 'exact', head: true })
@@ -46,14 +62,12 @@ export const UnreadProvider = ({ children }: { children: React.ReactNode }) => {
             }
 
             const { count, error } = await query;
-
             if (error) {
                 console.error('Error fetching unread count:', error);
                 return;
             }
 
             setUnreadCount(count || 0);
-
         } catch (error) {
             console.error('Error in refreshUnreadCount:', error);
         }

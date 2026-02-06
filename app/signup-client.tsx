@@ -128,6 +128,7 @@ export default function SignupClientScreen() {
             Alert.alert('Cadastro realizado!', `Usuário criado, mas houve um erro ao salvar dados do cliente: ${dbError.message}`);
         } else {
             await AsyncStorage.setItem('user_id', String(newLoginId));
+            await AsyncStorage.setItem('user_type', 'cliente');
 
             Alert.alert('Sucesso!', 'Cadastro realizado com sucesso.');
             router.replace('/(client)/home');
