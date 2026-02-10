@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { Camera, LogOut, Plus } from 'lucide-react-native';
+import { Camera, LogOut, Plus, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -81,6 +81,12 @@ export default function ProviderProfileScreen() {
         } finally {
             setCepLoading(false);
         }
+    }
+
+    async function removePortfolioImage(index: number) {
+        const newImages = [...portfolioImages];
+        newImages.splice(index, 1);
+        setPortfolioImages(newImages);
     }
 
     async function fetchProfileData() {
@@ -507,6 +513,12 @@ export default function ProviderProfileScreen() {
                         {portfolioImages.map((uri, index) => (
                             <View key={index} style={styles.portfolioCard}>
                                 <Image source={{ uri }} style={styles.modernPortfolioImage} />
+                                <TouchableOpacity
+                                    style={styles.removePortfolioButton}
+                                    onPress={() => removePortfolioImage(index)}
+                                >
+                                    <X size={14} color="#FFF" />
+                                </TouchableOpacity>
                             </View>
                         ))}
                     </ScrollView>
@@ -663,5 +675,21 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: 'bold'
+    },
+    removePortfolioButton: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: 'rgba(239, 68, 68, 0.9)',
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 4
     }
 });
