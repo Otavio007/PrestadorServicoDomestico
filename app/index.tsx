@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 import { useRouter } from 'expo-router';
-import { Briefcase, CheckCircle, Eye, EyeOff, Home, Lock, Mail, User, UserCircle, X } from 'lucide-react-native';
+import { Briefcase, CheckCircle, Eye, EyeOff, FileText, Home, Lock, Mail, User, UserCircle, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ResponsiveView } from '../components/ResponsiveView';
@@ -16,6 +17,13 @@ export default function LoginScreen() {
     const [loginError, setLoginError] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [signupModalVisible, setSignupModalVisible] = useState(false);
+
+    // Forgot Password State
+    const [forgotPasswordModalVisible, setForgotPasswordModalVisible] = useState(false);
+    const [forgotCpf, setForgotCpf] = useState('');
+    const [forgotLoading, setForgotLoading] = useState(false);
+    const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+    const [forgotMessageType, setForgotMessageType] = useState<'success' | 'error'>('error');
 
     async function handleLogin() {
         setLoading(true);
@@ -71,6 +79,115 @@ export default function LoginScreen() {
             alert('Ocorreu um erro inesperado ao tentar logar.');
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleForgotPassword() {
+        if (!forgotCpf) {
+            setForgotMessage('Por favor, informe o CPF.');
+            setForgotMessageType('error');
+            return;
+        }
+
+        setForgotLoading(true);
+        setForgotMessage(null);
+
+        try {
+            const rawCpf = forgotCpf.trim();
+            const digitsOnlyCpf = rawCpf.replace(/\D/g, '');
+
+            // 1. Get login info from access table
+            // Try raw input first
+            let { data: accessData, error: accessError } = await supabase
+                .from('acesso')
+                .select('login, tipo_login, senha')
+                .eq('CPF', rawCpf)
+                .maybeSingle();
+
+            // If not found and input had special chars, try digits only 
+            if (!accessData && !accessError && rawCpf !== digitsOnlyCpf) {
+                const retry = await supabase
+                    .from('acesso')
+                    .select('login, tipo_login, senha')
+                    .eq('CPF', digitsOnlyCpf)
+                    .maybeSingle();
+                accessData = retry.data;
+                accessError = retry.error;
+            }
+
+            if (accessError) throw accessError;
+
+            if (!accessData) {
+                setForgotMessage('CPF não cadastrado no sistema.');
+                setForgotMessageType('error');
+                return;
+            }
+
+            // 2. Based on type, get the email and name from 'prestador' or 'cliente'
+            let email = '';
+            let userName = 'Usuário';
+            const userType = accessData.tipo_login?.toLowerCase();
+
+            if (userType === 'prestador' || userType === 'prestador de serviço') {
+                const { data: providerData, error: pError } = await supabase
+                    .from('prestador')
+                    .select('email, nome')
+                    .eq('id_prestador', accessData.login)
+                    .maybeSingle();
+                if (pError) throw pError;
+                if (providerData) {
+                    email = providerData.email;
+                    userName = providerData.nome;
+                }
+            } else {
+                const { data: clientData, error: cError } = await supabase
+                    .from('cliente')
+                    .select('email, nome')
+                    .eq('id_cliente', accessData.login)
+                    .maybeSingle();
+                if (cError) throw cError;
+                if (clientData) {
+                    email = clientData.email;
+                    userName = clientData.nome;
+                }
+            }
+
+            if (!email) {
+                setForgotMessage('Email não encontrado para este CPF.');
+                setForgotMessageType('error');
+                return;
+            }
+
+            // 3. Send real email via EmailJS REST API
+            const emailJsData = {
+                service_id: 'service_gf46398',
+                template_id: 'template_lobpc49',
+                user_id: '85bD8KodVoekKXr3Z',
+                template_params: {
+                    user_name: userName,
+                    user_email: email,
+                    password: accessData.senha
+                }
+            };
+
+            await axios.post('https://api.emailjs.com/api/v1.0/email/send', emailJsData);
+
+            // Masking email for security in UI
+            const [emailUser, domain] = email.split('@');
+            const maskedEmail = domain
+                ? `${emailUser.substring(0, 2)}***${emailUser.substring(emailUser.length - 1)}@${domain}`
+                : `${emailUser.substring(0, 2)}***`;
+
+            setForgotMessage(`Sua senha foi enviada para o e-mail: ${maskedEmail}`);
+            setForgotMessageType('success');
+
+        } catch (err: any) {
+            console.error('Forgot Password Error:', err);
+            const errorMsg = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
+            setForgotMessage(`Erro: ${errorMsg}`);
+            setForgotMessageType('error');
+        } finally {
+            setForgotLoading(false);
         }
     }
 
@@ -166,7 +283,14 @@ export default function LoginScreen() {
                                 </View>
                             )}
 
-                            <TouchableOpacity style={styles.forgotPassword}>
+                            <TouchableOpacity
+                                style={styles.forgotPassword}
+                                onPress={() => {
+                                    setForgotMessage(null);
+                                    setForgotCpf('');
+                                    setForgotPasswordModalVisible(true);
+                                }}
+                            >
                                 <Text style={styles.forgotPasswordText}>Esqueceu a senha?</Text>
                             </TouchableOpacity>
 
@@ -241,6 +365,67 @@ export default function LoginScreen() {
                                     <Text style={styles.optionDescription}>Estou buscando profissionais.</Text>
                                 </View>
                             </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Forgot Password Modal */}
+                <Modal
+                    animationType="slide"
+                    transparent={true}
+                    visible={forgotPasswordModalVisible}
+                    onRequestClose={() => setForgotPasswordModalVisible(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Recuperar Senha</Text>
+                                <TouchableOpacity onPress={() => setForgotPasswordModalVisible(false)}>
+                                    <X color={Palette.text} size={24} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.modalSubtitle}>
+                                Digite seu CPF para receber sua senha por e-mail.
+                            </Text>
+
+                            <View style={styles.modalForm}>
+                                <View style={[styles.inputContainer, { backgroundColor: Palette.background }]}>
+                                    <FileText color={Palette.textSecondary} size={20} style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="CPF"
+                                        placeholderTextColor={Palette.textPlaceholder}
+                                        value={forgotCpf}
+                                        onChangeText={setForgotCpf}
+                                        keyboardType="numeric"
+                                    />
+                                </View>
+
+                                {forgotMessage && (
+                                    <View style={[
+                                        styles.errorContainer,
+                                        forgotMessageType === 'success' && { backgroundColor: Palette.successBackground, borderColor: Palette.success }
+                                    ]}>
+                                        <Text style={[
+                                            styles.errorText,
+                                            forgotMessageType === 'success' && { color: Palette.success }
+                                        ]}>
+                                            {forgotMessage}
+                                        </Text>
+                                    </View>
+                                )}
+
+                                <TouchableOpacity
+                                    style={[styles.loginButton, forgotLoading && styles.loginButtonDisabled]}
+                                    onPress={handleForgotPassword}
+                                    disabled={forgotLoading}
+                                >
+                                    <Text style={styles.loginButtonText}>
+                                        {forgotLoading ? 'Consultando...' : 'Recuperar Senha'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                 </Modal>
@@ -521,5 +706,14 @@ const styles = StyleSheet.create({
     optionDescription: {
         fontSize: 13,
         color: Palette.textSecondary,
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: Palette.textSecondary,
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    modalForm: {
+        width: '100%',
     },
 });

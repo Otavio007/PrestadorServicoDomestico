@@ -9,9 +9,12 @@ import { SearchableSelect, SearchableSelectItem } from '../components/Searchable
 import { Palette } from '../constants/theme';
 import { supabase } from '../lib/supabase';
 
+import { fetchAddressByCep } from '../lib/address';
+
 export default function SignupClientScreen() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [cepLoading, setCepLoading] = useState(false);
 
     // Form State
     const [name, setName] = useState('');
@@ -36,6 +39,38 @@ export default function SignupClientScreen() {
     useEffect(() => {
         fetchCities();
     }, []);
+
+    useEffect(() => {
+        const cleanedZip = zip.replace(/\D/g, '');
+        if (cleanedZip.length === 8) {
+            handleCepLookup(cleanedZip);
+        }
+    }, [zip]);
+
+    async function handleCepLookup(cleanedZip: string) {
+        try {
+            setCepLoading(true);
+            const address = await fetchAddressByCep(cleanedZip);
+            if (address) {
+                setStreet(address.logradouro || '');
+                setDistrict(address.bairro || '');
+                setState(address.uf || '');
+
+                if (cities.length > 0) {
+                    const cityMatch = cities.find(c =>
+                        c.label.toLowerCase().includes(address.localidade.toLowerCase())
+                    );
+                    if (cityMatch) {
+                        setSelectedCity(cityMatch.value);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('CEP Lookup error:', error);
+        } finally {
+            setCepLoading(false);
+        }
+    }
 
     async function fetchCities() {
         try {

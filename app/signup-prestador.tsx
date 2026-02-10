@@ -9,9 +9,12 @@ import { SearchableSelect, SearchableSelectItem } from '../components/Searchable
 import { Palette } from '../constants/theme';
 import { supabase } from '../lib/supabase';
 
+import { fetchAddressByCep } from '../lib/address';
+
 export default function SignupPrestadorScreen() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [cepLoading, setCepLoading] = useState(false);
 
     // Form State
     const [name, setName] = useState('');
@@ -41,6 +44,39 @@ export default function SignupPrestadorScreen() {
     useEffect(() => {
         fetchData();
     }, []);
+
+    useEffect(() => {
+        const cleanedZip = zip.replace(/\D/g, '');
+        if (cleanedZip.length === 8) {
+            handleCepLookup(cleanedZip);
+        }
+    }, [zip]);
+
+    async function handleCepLookup(cleanedZip: string) {
+        try {
+            setCepLoading(true);
+            const address = await fetchAddressByCep(cleanedZip);
+            if (address) {
+                setStreet(address.logradouro || '');
+                setDistrict(address.bairro || '');
+                setState(address.uf || '');
+
+                // Fetch cities if not loaded yet or just match
+                if (cities.length > 0) {
+                    const cityMatch = cities.find(c =>
+                        c.label.toLowerCase().includes(address.localidade.toLowerCase())
+                    );
+                    if (cityMatch) {
+                        setSelectedCity(cityMatch.value);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('CEP Lookup error:', error);
+        } finally {
+            setCepLoading(false);
+        }
+    }
 
     async function fetchData() {
         try {
@@ -132,7 +168,7 @@ export default function SignupPrestadorScreen() {
                     num_logradouro: number,
                     bairro: district,
                     cep: zip,
-                    id_cidade: selectedCity,
+                    id_cidade: selectedCity ? Number(selectedCity) : null,
                 });
 
             if (prestadorError) throw new Error(`Erro no prestador: ${prestadorError.message}`);
@@ -141,7 +177,7 @@ export default function SignupPrestadorScreen() {
             if (selectedServices.length > 0) {
                 const serviceInserts = selectedServices.map(serviceId => ({
                     id_prestador: loginId,
-                    id_servico: serviceId
+                    id_servico: Number(serviceId)
                 }));
 
                 const { error: servicoError } = await supabase
@@ -152,25 +188,17 @@ export default function SignupPrestadorScreen() {
             }
 
             // 4. Insert Selected Cities into 'cidade_atuacao'
-            // User requested: for each selected city, perform an insert
             if (selectedCities.length > 0) {
-                console.log('Starting individual city insertions for prestador:', loginId);
+                const cityInserts = selectedCities.map(cityId => ({
+                    id_prestador: loginId,
+                    id_cidade: Number(cityId)
+                }));
 
-                for (const cityId of selectedCities) {
-                    const { error: cityError } = await supabase
-                        .from('cidade_atuacao')
-                        .insert({
-                            id_prestador: loginId,
-                            id_cidade: cityId
-                        });
+                const { error: cityError } = await supabase
+                    .from('cidade_atuacao')
+                    .insert(cityInserts);
 
-                    if (cityError) {
-                        console.error(`Error inserting city ID ${cityId}:`, cityError);
-                        // We continue with other cities but log the error
-                    } else {
-                        console.log(`City ID ${cityId} linked successfully.`);
-                    }
-                }
+                if (cityError) throw new Error(`Erro ao vincular cidades de atuação: ${cityError.message}`);
             }
 
             // Save session ID for auto-login behavior

@@ -8,8 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchableSelect, SearchableSelectItem } from '../../components/SearchableSelect';
 import { supabase } from '../../lib/supabase';
 
+import { fetchAddressByCep } from '../../lib/address';
+
 export default function ProviderProfileScreen() {
     const router = useRouter();
+    const [cepLoading, setCepLoading] = useState(false);
 
 
     // State for fields
@@ -47,6 +50,38 @@ export default function ProviderProfileScreen() {
     useEffect(() => {
         fetchProfileData();
     }, []);
+
+    useEffect(() => {
+        const cleanedZip = zip.replace(/\D/g, '');
+        if (cleanedZip.length === 8) {
+            handleCepLookup(cleanedZip);
+        }
+    }, [zip]);
+
+    async function handleCepLookup(cleanedZip: string) {
+        try {
+            setCepLoading(true);
+            const address = await fetchAddressByCep(cleanedZip);
+            if (address) {
+                setStreet(address.logradouro || '');
+                setDistrict(address.bairro || '');
+                setState(address.uf || '');
+
+                if (citiesList.length > 0) {
+                    const cityMatch = citiesList.find(c =>
+                        c.label.toLowerCase().includes(address.localidade.toLowerCase())
+                    );
+                    if (cityMatch) {
+                        setSelectedCity(cityMatch.value as number);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('CEP Lookup error:', error);
+        } finally {
+            setCepLoading(false);
+        }
+    }
 
     async function fetchProfileData() {
         try {
@@ -194,23 +229,22 @@ export default function ProviderProfileScreen() {
 
         try {
             setSaving(true);
-            console.log('Iniciando salvamento completo do perfil...');
+            const numUserId = Number(currentUserId);
+            console.log('Iniciando salvamento completo do perfil para ID:', numUserId);
 
             // 1. Update Provider Basic Info & Address
             // CEP in DB is bigint, CPF/Phone are limited length strings
             const numericZip = zip ? parseInt(zip.replace(/\D/g, ''), 10) : null;
             const cleanedCpf = cpf ? cpf.replace(/\D/g, '').substring(0, 14) : '';
             const cleanedPhone = phone ? phone.replace(/\D/g, '').substring(0, 11) : '';
+            const numCity = selectedCity ? Number(selectedCity) : null;
 
-            console.log('Dados formatados para envio:', {
+            console.log('Dados formatados para envio (prestador):', {
                 nome: name,
                 fone1: cleanedPhone,
                 email: email,
                 cpf_cnpj: cleanedCpf,
-                texto_meuperfil: (description || '').trim(),
-                cep: numericZip,
-                id_cidade: selectedCity,
-                uf: state
+                id_cidade: numCity,
             });
 
             const { error: pError, count } = await supabase
@@ -225,10 +259,10 @@ export default function ProviderProfileScreen() {
                     num_logradouro: number || null,
                     bairro: district,
                     cep: numericZip,
-                    id_cidade: selectedCity,
+                    id_cidade: numCity,
                     uf: state,
                 }, { count: 'exact' })
-                .eq('id_prestador', currentUserId);
+                .eq('id_prestador', numUserId);
 
             if (pError) {
                 console.error('Database Update Error:', pError);
@@ -245,31 +279,31 @@ export default function ProviderProfileScreen() {
             // 1.5. Update Login Info (CPF) in 'acesso' table
             const { error: aError } = await supabase
                 .from('acesso')
-                .update({ CPF: cpf })
-                .eq('login', currentUserId);
+                .update({ CPF: cleanedCpf })
+                .eq('login', numUserId);
 
             if (aError) console.warn('Erro ao sincronizar CPF no acesso:', aError);
 
             // 2. Update Services (Always clear and re-insert if needed)
-            await supabase.from('servico_prestador').delete().eq('id_prestador', currentUserId);
+            await supabase.from('servico_prestador').delete().eq('id_prestador', numUserId);
             if (selectedServices.length > 0) {
                 const serviceInserts = selectedServices.map(serviceId => ({
-                    id_prestador: currentUserId,
-                    id_servico: serviceId
+                    id_prestador: numUserId,
+                    id_servico: Number(serviceId)
                 }));
                 const { error: sError } = await supabase.from('servico_prestador').insert(serviceInserts);
-                if (sError) throw new Error(`Erro ao salvar serviços: ${sError.message}`);
+                if (sError) throw sError;
             }
 
             // 3. Update Cities of Operation (Always clear and re-insert if needed)
-            await supabase.from('cidade_atuacao').delete().eq('id_prestador', currentUserId);
+            await supabase.from('cidade_atuacao').delete().eq('id_prestador', numUserId);
             if (selectedCities.length > 0) {
                 const cityInserts = selectedCities.map(cityId => ({
-                    id_prestador: currentUserId,
-                    id_cidade: cityId
+                    id_prestador: numUserId,
+                    id_cidade: Number(cityId)
                 }));
-                const { error: cError } = await supabase.from('cidade_atuacao').insert(cityInserts);
-                if (cError) throw new Error(`Erro ao salvar cidades: ${cError.message}`);
+                const { error: cError = {} as any } = await supabase.from('cidade_atuacao').insert(cityInserts);
+                if (cError && cError.message) throw cError;
             }
 
             // 4. Update Portfolio Images
