@@ -152,7 +152,14 @@ export default function ChatsScreen() {
             <StatusBar barStyle="dark-content" />
 
             <View style={styles.header}>
-                <Text style={styles.title}>Mensagens</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Image
+                        source={require('../../assets/images/logo.png')}
+                        style={{ width: 40, height: 40 }}
+                        resizeMode="contain"
+                    />
+                    <Text style={[styles.title, { marginLeft: 8 }]}>ConcertJá - Mensagens</Text>
+                </View>
             </View>
 
             <View style={styles.searchContainer}>

@@ -109,7 +109,14 @@ export default function ClientProfileScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>Meu Perfil</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Image
+                        source={require('../../assets/images/logo.png')}
+                        style={{ width: 40, height: 40 }}
+                        resizeMode="contain"
+                    />
+                    <Text style={[styles.title, { marginLeft: 8 }]}>ConcertJá - Meu Perfil</Text>
+                </View>
             </View>
 
             <View style={styles.content}>

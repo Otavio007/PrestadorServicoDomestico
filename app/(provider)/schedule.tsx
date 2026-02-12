@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { MapPin, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CalendarView } from '../../components/CalendarView';
 import { SearchableSelect, SearchableSelectItem } from '../../components/SearchableSelect';
@@ -301,7 +301,14 @@ export default function ScheduleScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Agenda</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Image
+                        source={require('../../assets/images/logo.png')}
+                        style={{ width: 40, height: 40 }}
+                        resizeMode="contain"
+                    />
+                    <Text style={[styles.headerTitle, { marginLeft: 8 }]}>ConcertJá - Agenda</Text>
+                </View>
             </View>
 
             <ScrollView contentContainerStyle={styles.contentParams}>

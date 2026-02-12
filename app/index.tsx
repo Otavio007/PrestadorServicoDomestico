@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
-import { Briefcase, CheckCircle, Eye, EyeOff, FileText, Home, Lock, Mail, User, UserCircle, X } from 'lucide-react-native';
+import { Briefcase, CheckCircle, Eye, EyeOff, FileText, Home, Lock, Mail, User, X } from 'lucide-react-native';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ResponsiveView } from '../components/ResponsiveView';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { Palette } from '../constants/theme';
@@ -235,9 +235,13 @@ export default function LoginScreen() {
                     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                         <View style={styles.header}>
                             <View style={styles.logoContainer}>
-                                <UserCircle size={60} color={Palette.primary} />
+                                <Image
+                                    source={require('../assets/images/logo.png')}
+                                    style={{ width: 80, height: 80 }}
+                                    resizeMode="contain"
+                                />
                             </View>
-                            <Text style={styles.title}>Bem-vindo de volta!</Text>
+                            <Text style={styles.title}>ConcertJá</Text>
                             <Text style={styles.subtitle}>Acesse sua conta para continuar</Text>
                         </View>
 

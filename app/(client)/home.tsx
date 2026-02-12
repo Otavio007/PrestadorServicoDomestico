@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 interface Provider {
     id: string;
     name: string;
+    nomeFantasia?: string;
     service: string;
     rating: number; // Placeholder, not in DB yet
     city: string;
@@ -65,7 +66,7 @@ export default function ClientHomeScreen() {
             // 1. Busca os prestadores
             const { data: prestadores, error } = await supabase
                 .from('prestador')
-                .select('id_prestador, nome, id_cidade');
+                .select('id_prestador, nome, nome_fantasia, id_cidade');
 
             if (error || !prestadores) return;
 
@@ -114,13 +115,18 @@ export default function ClientHomeScreen() {
                     .eq('id_usuario', p.id_prestador)
                     .maybeSingle();
 
+                const displayName = p.nome_fantasia && p.nome_fantasia.trim() !== ''
+                    ? p.nome_fantasia
+                    : p.nome;
+
                 return {
                     id: p.id_prestador.toString(),
-                    name: p.nome,
+                    name: displayName,
+                    nomeFantasia: p.nome_fantasia,
                     service: serviceText,
                     rating: notaData?.media_nota || 0,
                     city: CidadeMoradia,
-                    avatar: profileImg?.img || `https://ui-avatars.com/api/?name=${p.nome}&background=random`,
+                    avatar: profileImg?.img || `https://ui-avatars.com/api/?name=${displayName}&background=random`,
                 };
             }));
 
@@ -177,8 +183,15 @@ export default function ClientHomeScreen() {
 
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Encontre Profissionais</Text>
-                <Text style={styles.headerSubtitle}>Os melhores perto de você.</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                    <Image
+                        source={require('../../assets/images/logo.png')}
+                        style={{ width: 40, height: 40 }}
+                        resizeMode="contain"
+                    />
+                    <Text style={[styles.headerTitle, { marginLeft: 8 }]}>ConcertJá</Text>
+                </View>
+                <Text style={styles.headerSubtitle}>Os melhores profissionais perto de você.</Text>
             </View>
 
             {/* Search Bar */}

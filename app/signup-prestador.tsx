@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Briefcase, Calendar, FileText, Mail, MapPin, Phone, Shield, TrendingUp, User } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ResponsiveView } from '../components/ResponsiveView';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { SearchableSelect, SearchableSelectItem } from '../components/SearchableSelect';
@@ -150,7 +150,7 @@ export default function SignupPrestadorScreen() {
                 .select('login')
                 .single();
 
-            if (acessoError) throw new Error(`Erro no acesso: ${acessoError.message}`);
+            if (acessoError) throw new Error(`Erro no acesso: ${acessoError.message} `);
             if (!acessoData?.login) throw new Error('Falha ao gerar ID de login.');
 
             const loginId = acessoData.login;
@@ -171,7 +171,7 @@ export default function SignupPrestadorScreen() {
                     id_cidade: selectedCity ? Number(selectedCity) : null,
                 });
 
-            if (prestadorError) throw new Error(`Erro no prestador: ${prestadorError.message}`);
+            if (prestadorError) throw new Error(`Erro no prestador: ${prestadorError.message} `);
 
             // 3. Insert into 'servico_prestador' table
             if (selectedServices.length > 0) {
@@ -184,7 +184,7 @@ export default function SignupPrestadorScreen() {
                     .from('servico_prestador')
                     .insert(serviceInserts);
 
-                if (servicoError) throw new Error(`Erro ao vincular serviços: ${servicoError.message}`);
+                if (servicoError) throw new Error(`Erro ao vincular serviços: ${servicoError.message} `);
             }
 
             // 4. Insert Selected Cities into 'cidade_atuacao'
@@ -198,7 +198,7 @@ export default function SignupPrestadorScreen() {
                     .from('cidade_atuacao')
                     .insert(cityInserts);
 
-                if (cityError) throw new Error(`Erro ao vincular cidades de atuação: ${cityError.message}`);
+                if (cityError) throw new Error(`Erro ao vincular cidades de atuação: ${cityError.message} `);
             }
 
             // Save session ID for auto-login behavior
@@ -259,7 +259,14 @@ export default function SignupPrestadorScreen() {
                             <ArrowLeft color={Palette.text} size={24} />
                         </TouchableOpacity>
 
-                        <Text style={styles.headerTitle}>Cadastro de Prestador</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                            <Image
+                                source={require('../assets/images/logo.png')}
+                                style={{ width: 40, height: 40 }}
+                                resizeMode="contain"
+                            />
+                            <Text style={[styles.headerTitle, { marginBottom: 0, marginLeft: 8 }]}>ConcertJá - Prestador</Text>
+                        </View>
                         <Text style={styles.headerSubtitle}>Junte-se a nós e ofereça seus serviços.</Text>
 
                         {/* Dados Pessoais */}

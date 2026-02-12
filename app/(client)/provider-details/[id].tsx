@@ -9,6 +9,7 @@ import { supabase } from '../../../lib/supabase';
 interface ProviderDetails {
     id: string;
     name: string;
+    nomeFantasia?: string;
     email: string;
     phone: string;
     about: string;
@@ -164,13 +165,18 @@ export default function ProviderDetailsScreen() {
                 .eq('id_usuario', id)
                 .maybeSingle();
 
+            const displayName = pData.nome_fantasia && pData.nome_fantasia.trim() !== ''
+                ? pData.nome_fantasia
+                : pData.nome;
+
             setProvider({
                 id: pData.id_prestador.toString(),
-                name: pData.nome,
+                name: displayName,
+                nomeFantasia: pData.nome_fantasia,
                 email: pData.email,
                 phone: pData.fone1,
                 about: pData.texto_meuperfil || 'Este profissional ainda não adicionou uma descrição ao seu perfil.',
-                avatar: profileImgData?.img || `https://ui-avatars.com/api/?name=${pData.nome}&background=4F46E5&color=fff&size=200`,
+                avatar: profileImgData?.img || `https://ui-avatars.com/api/?name=${displayName}&background=4F46E5&color=fff&size=200`,
                 services: serviceNames,
                 cities: cityNames,
                 portfolio: portfolioImages,

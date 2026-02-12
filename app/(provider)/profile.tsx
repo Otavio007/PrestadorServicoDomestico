@@ -22,6 +22,7 @@ export default function ProviderProfileScreen() {
 
     // Profile Data
     const [name, setName] = useState('');
+    const [nomeFantasia, setNomeFantasia] = useState('');
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
     const [cpf, setCpf] = useState('');
@@ -123,6 +124,7 @@ export default function ProviderProfileScreen() {
 
             if (providerData) {
                 setName(providerData.nome || '');
+                setNomeFantasia(providerData.nome_fantasia || '');
                 setPhone(providerData.fone1 || '');
                 setEmail(providerData.email || '');
                 setCpf(providerData.cpf_cnpj || '');
@@ -207,22 +209,28 @@ export default function ProviderProfileScreen() {
 
         if (!result.canceled) {
             const uri = result.assets[0].uri;
-            if (type === 'profile') {
-                // For profile, we'll convert to base64 to save directly in the DB as requested
-                try {
-                    const response = await fetch(uri);
-                    const blob = await response.blob();
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setProfileImage(reader.result as string);
-                    };
-                    reader.readAsDataURL(blob);
-                } catch (err) {
-                    console.error('Error converting image to base64:', err);
+
+            try {
+                const response = await fetch(uri);
+                const blob = await response.blob();
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64data = reader.result as string;
+                    if (type === 'profile') {
+                        setProfileImage(base64data);
+                    } else {
+                        setPortfolioImages([...portfolioImages, base64data]);
+                    }
+                };
+                reader.readAsDataURL(blob);
+            } catch (err) {
+                console.error('Error converting image to base64:', err);
+                // Fallback to URI if conversion fails (though it shouldn't)
+                if (type === 'profile') {
                     setProfileImage(uri);
+                } else {
+                    setPortfolioImages([...portfolioImages, uri]);
                 }
-            } else {
-                setPortfolioImages([...portfolioImages, uri]);
             }
         }
     };
@@ -247,6 +255,7 @@ export default function ProviderProfileScreen() {
 
             console.log('Dados formatados para envio (prestador):', {
                 nome: name,
+                nome_fantasia: nomeFantasia,
                 fone1: cleanedPhone,
                 email: email,
                 cpf_cnpj: cleanedCpf,
@@ -257,6 +266,7 @@ export default function ProviderProfileScreen() {
                 .from('prestador')
                 .update({
                     nome: name,
+                    nome_fantasia: nomeFantasia,
                     fone1: cleanedPhone,
                     email: email,
                     cpf_cnpj: cleanedCpf,
@@ -272,7 +282,7 @@ export default function ProviderProfileScreen() {
 
             if (pError) {
                 console.error('Database Update Error:', pError);
-                throw new Error(`Erro nos dados básicos: [${pError.code}] ${pError.message}`);
+                throw new Error(`Erro nos dados básicos: [${pError.code}] ${pError.message} `);
             }
 
             if (count === 0) {
@@ -321,7 +331,7 @@ export default function ProviderProfileScreen() {
                     imagem: imgUri,
                 }));
                 const { error: portfolioError } = await supabase.from('imagem_portfolio').insert(portfolioInserts);
-                if (portfolioError) throw new Error(`Erro ao salvar portfólio: ${portfolioError.message}`);
+                if (portfolioError) throw new Error(`Erro ao salvar portfólio: ${portfolioError.message} `);
             }
 
             // 5. Update Profile Image
@@ -331,7 +341,7 @@ export default function ProviderProfileScreen() {
                     id_usuario: currentUserId,
                     img: profileImage
                 });
-                if (imgError) throw new Error(`Erro ao salvar foto de perfil: ${imgError.message}`);
+                if (imgError) throw new Error(`Erro ao salvar foto de perfil: ${imgError.message} `);
             }
 
             setShowSuccessModal(true);
@@ -368,7 +378,14 @@ export default function ProviderProfileScreen() {
 
                 {/* Header */}
                 <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle}>Meu Perfil</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Image
+                            source={require('../../assets/images/logo.png')}
+                            style={{ width: 40, height: 40 }}
+                            resizeMode="contain"
+                        />
+                        <Text style={[styles.headerTitle, { marginLeft: 8 }]}>ConcertJá - Meu Perfil</Text>
+                    </View>
                 </View>
 
                 {/* 1. Header / Avatar Section */}
@@ -388,6 +405,7 @@ export default function ProviderProfileScreen() {
                     </TouchableOpacity>
 
                     {/* Editable Name */}
+                    <Text style={styles.labelSmall}>Nome Completo</Text>
                     <TextInput
                         style={styles.nameInput}
                         value={name}
@@ -395,6 +413,16 @@ export default function ProviderProfileScreen() {
                         placeholder="Seu Nome"
                         textAlign="center"
                     />
+
+                    <Text style={styles.labelSmall}>Nome Fantasia / Comercial</Text>
+                    <TextInput
+                        style={[styles.nameInput, { fontSize: 18, color: '#4F46E5' }]}
+                        value={nomeFantasia}
+                        onChangeText={setNomeFantasia}
+                        placeholder="Ex: Refromas e Pinturas"
+                        textAlign="center"
+                    />
+
                     <Text style={styles.userRole}>{currentServiceLabel}</Text>
 
                     <TouchableOpacity
@@ -605,6 +633,7 @@ const styles = StyleSheet.create({
     // Save Button
     saveButton: { backgroundColor: '#4F46E5', paddingVertical: 12, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center', marginTop: 16, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4, width: '100%', maxWidth: 300 },
     saveButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+    labelSmall: { fontSize: 12, color: '#9CA3AF', marginBottom: 2, marginTop: 8 },
 
     // Logout
     logoutButton: {

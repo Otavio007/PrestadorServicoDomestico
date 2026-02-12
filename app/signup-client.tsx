@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, CheckCircle, FileText, Mail, MapPin, Phone, User } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ResponsiveView } from '../components/ResponsiveView';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { SearchableSelect, SearchableSelectItem } from '../components/SearchableSelect';
@@ -215,7 +215,14 @@ export default function SignupClientScreen() {
                             <ArrowLeft color={Palette.text} size={24} />
                         </TouchableOpacity>
 
-                        <Text style={styles.headerTitle}>Cadastro de Cliente</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                            <Image
+                                source={require('../assets/images/logo.png')}
+                                style={{ width: 40, height: 40 }}
+                                resizeMode="contain"
+                            />
+                            <Text style={[styles.headerTitle, { marginBottom: 0, marginLeft: 8 }]}>ConcertJá - Cliente</Text>
+                        </View>
                         <Text style={styles.headerSubtitle}>Cadastre-se para encontrar os melhores profissionais.</Text>
 
                         {/* Dados Pessoais */}
