@@ -265,7 +265,7 @@ export default function SignupPrestadorScreen() {
                                 style={{ width: 40, height: 40 }}
                                 resizeMode="contain"
                             />
-                            <Text style={[styles.headerTitle, { marginBottom: 0, marginLeft: 8 }]}>ConcertJá - Prestador</Text>
+                            <Text style={[styles.headerTitle, { marginBottom: 0, marginLeft: 8 }]}>ConsertJá - Prestador</Text>
                         </View>
                         <Text style={styles.headerSubtitle}>Junte-se a nós e ofereça seus serviços.</Text>
 

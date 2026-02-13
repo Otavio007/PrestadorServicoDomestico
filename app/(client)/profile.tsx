@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { Camera, LogOut, User } from 'lucide-react-native';
+import { Camera, LogOut, MessageCircle, User } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
+import { openWhatsAppSupport } from '../../lib/support';
 
 export default function ClientProfileScreen() {
     const router = useRouter();
@@ -115,7 +116,7 @@ export default function ClientProfileScreen() {
                         style={{ width: 40, height: 40 }}
                         resizeMode="contain"
                     />
-                    <Text style={[styles.title, { marginLeft: 8 }]}>ConcertJá - Meu Perfil</Text>
+                    <Text style={[styles.title, { marginLeft: 8 }]}>ConsertJá - Meu Perfil</Text>
                 </View>
             </View>
 
@@ -142,6 +143,14 @@ export default function ClientProfileScreen() {
                     disabled={saving}
                 >
                     <Text style={styles.saveButtonText}>{saving ? 'Salvando...' : 'Salvar Perfil'}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.supportButton}
+                    onPress={openWhatsAppSupport}
+                >
+                    <MessageCircle size={20} color="#4F46E5" style={{ marginRight: 8 }} />
+                    <Text style={styles.supportButtonText}>Suporte via WhatsApp</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -220,4 +229,16 @@ const styles = StyleSheet.create({
         borderColor: '#FEE2E2',
     },
     logoutText: { color: '#EF4444', fontSize: 16, fontWeight: '600' },
+    supportButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EEF2FF',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#C7D2FE',
+        marginBottom: 16,
+    },
+    supportButtonText: { color: '#4F46E5', fontSize: 16, fontWeight: '600' },
 });

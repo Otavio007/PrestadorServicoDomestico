@@ -221,7 +221,7 @@ export default function SignupClientScreen() {
                                 style={{ width: 40, height: 40 }}
                                 resizeMode="contain"
                             />
-                            <Text style={[styles.headerTitle, { marginBottom: 0, marginLeft: 8 }]}>ConcertJá - Cliente</Text>
+                            <Text style={[styles.headerTitle, { marginBottom: 0, marginLeft: 8 }]}>ConsertJá - Cliente</Text>
                         </View>
                         <Text style={styles.headerSubtitle}>Cadastre-se para encontrar os melhores profissionais.</Text>
 

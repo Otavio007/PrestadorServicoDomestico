@@ -1,13 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
-import { Briefcase, CheckCircle, Eye, EyeOff, FileText, Home, Lock, Mail, User, X } from 'lucide-react-native';
+import { Briefcase, CheckCircle, Eye, EyeOff, FileText, Home, Lock, Mail, MessageCircle, User, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ResponsiveView } from '../components/ResponsiveView';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { Palette } from '../constants/theme';
 import { supabase } from '../lib/supabase';
+import { openWhatsAppSupport } from '../lib/support';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -241,7 +242,7 @@ export default function LoginScreen() {
                                     resizeMode="contain"
                                 />
                             </View>
-                            <Text style={styles.title}>ConcertJá</Text>
+                            <Text style={styles.title}>ConsertJá</Text>
                             <Text style={styles.subtitle}>Acesse sua conta para continuar</Text>
                         </View>
 
@@ -434,6 +435,15 @@ export default function LoginScreen() {
                     </View>
                 </Modal>
             </ResponsiveView>
+
+            {/* Floating Support Icon */}
+            <TouchableOpacity
+                style={styles.floatingSupportButton}
+                onPress={openWhatsAppSupport}
+                activeOpacity={0.7}
+            >
+                <MessageCircle color="#FFF" size={24} />
+            </TouchableOpacity>
         </ScreenWrapper>
     );
 }
@@ -666,8 +676,25 @@ const styles = StyleSheet.create({
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
-        shadowRadius: 12,
+        shadowRadius: 20,
         elevation: 10,
+    },
+    floatingSupportButton: {
+        position: 'absolute',
+        bottom: 24,
+        right: 24,
+        backgroundColor: '#25D366', // WhatsApp Green
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 8,
+        zIndex: 999,
     },
     modalHeader: {
         flexDirection: 'row',

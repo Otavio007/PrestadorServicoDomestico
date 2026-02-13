@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "ConcertJá",
-    "slug": "concert-ja",
+    "name": "ConsertJá",
+    "slug": "consert-ja",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "concertja",
+    "scheme": "consertja",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.concertja.app"
+      "bundleIdentifier": "com.consertja.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +19,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "package": "com.concertja.app",
+      "package": "com.consertja.app",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },

@@ -307,7 +307,7 @@ export default function ScheduleScreen() {
                         style={{ width: 40, height: 40 }}
                         resizeMode="contain"
                     />
-                    <Text style={[styles.headerTitle, { marginLeft: 8 }]}>ConcertJá - Agenda</Text>
+                    <Text style={[styles.headerTitle, { marginLeft: 8 }]}>ConsertJá - Agenda</Text>
                 </View>
             </View>
 

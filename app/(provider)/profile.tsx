@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { Camera, LogOut, Plus, X } from 'lucide-react-native';
+import { Camera, LogOut, MessageCircle, Plus, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchableSelect, SearchableSelectItem } from '../../components/SearchableSelect';
 import { supabase } from '../../lib/supabase';
+import { openWhatsAppSupport } from '../../lib/support';
 
 import { fetchAddressByCep } from '../../lib/address';
 
@@ -384,7 +385,7 @@ export default function ProviderProfileScreen() {
                             style={{ width: 40, height: 40 }}
                             resizeMode="contain"
                         />
-                        <Text style={[styles.headerTitle, { marginLeft: 8 }]}>ConcertJá - Meu Perfil</Text>
+                        <Text style={[styles.headerTitle, { marginLeft: 8 }]}>ConsertJá - Meu Perfil</Text>
                     </View>
                 </View>
 
@@ -554,6 +555,12 @@ export default function ProviderProfileScreen() {
 
                 {/* Save Button */}
 
+                {/* Support Button */}
+                <TouchableOpacity style={styles.supportButton} onPress={openWhatsAppSupport}>
+                    <MessageCircle size={20} color="#4F46E5" style={{ marginRight: 8 }} />
+                    <Text style={styles.supportButtonText}>Suporte via WhatsApp</Text>
+                </TouchableOpacity>
+
                 {/* Logout Button */}
                 <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                     <LogOut size={20} color="#EF4444" style={{ marginRight: 8 }} />
@@ -648,6 +655,18 @@ const styles = StyleSheet.create({
         marginTop: 16,
     },
     logoutText: { color: '#EF4444', fontSize: 16, fontWeight: '600' },
+    supportButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#EEF2FF',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#C7D2FE',
+        marginTop: 16,
+    },
+    supportButtonText: { color: '#4F46E5', fontSize: 16, fontWeight: '600' },
 
     // Success Modal Styles
     modalOverlay: {

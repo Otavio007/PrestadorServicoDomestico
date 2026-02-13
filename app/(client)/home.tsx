@@ -189,7 +189,7 @@ export default function ClientHomeScreen() {
                         style={{ width: 40, height: 40 }}
                         resizeMode="contain"
                     />
-                    <Text style={[styles.headerTitle, { marginLeft: 8 }]}>ConcertJá</Text>
+                    <Text style={[styles.headerTitle, { marginLeft: 8 }]}>ConsertJá</Text>
                 </View>
                 <Text style={styles.headerSubtitle}>Os melhores profissionais perto de você.</Text>
             </View>

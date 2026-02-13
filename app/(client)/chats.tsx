@@ -158,7 +158,7 @@ export default function ChatsScreen() {
                         style={{ width: 40, height: 40 }}
                         resizeMode="contain"
                     />
-                    <Text style={[styles.title, { marginLeft: 8 }]}>ConcertJá - Mensagens</Text>
+                    <Text style={[styles.title, { marginLeft: 8 }]}>ConsertJá - Mensagens</Text>
                 </View>
             </View>
 
