@@ -6,10 +6,10 @@ import { useEffect, useState } from 'react';
 import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchableSelect, SearchableSelectItem } from '../../components/SearchableSelect';
+import { fetchAddressByCep } from '../../lib/address';
+import { maskCpf, maskPhone, unmask } from '../../lib/masks';
 import { supabase } from '../../lib/supabase';
 import { openWhatsAppSupport } from '../../lib/support';
-
-import { fetchAddressByCep } from '../../lib/address';
 
 export default function ProviderProfileScreen() {
     const router = useRouter();
@@ -126,9 +126,9 @@ export default function ProviderProfileScreen() {
             if (providerData) {
                 setName(providerData.nome || '');
                 setNomeFantasia(providerData.nome_fantasia || '');
-                setPhone(providerData.fone1 || '');
+                setPhone(maskPhone(providerData.fone1 || ''));
                 setEmail(providerData.email || '');
-                setCpf(providerData.cpf_cnpj || '');
+                setCpf(maskCpf(providerData.cpf_cnpj || ''));
                 setDescription(providerData.texto_meuperfil || '');
 
                 // Address fields
@@ -244,14 +244,14 @@ export default function ProviderProfileScreen() {
 
         try {
             setSaving(true);
-            const numUserId = Number(currentUserId);
-            console.log('Iniciando salvamento completo do perfil para ID:', numUserId);
+            const userId = currentUserId; // UUID is a string
+            console.log('Iniciando salvamento completo do perfil para ID:', userId);
 
             // 1. Update Provider Basic Info & Address
             // CEP in DB is bigint, CPF/Phone are limited length strings
-            const numericZip = zip ? parseInt(zip.replace(/\D/g, ''), 10) : null;
-            const cleanedCpf = cpf ? cpf.replace(/\D/g, '').substring(0, 14) : '';
-            const cleanedPhone = phone ? phone.replace(/\D/g, '').substring(0, 11) : '';
+            const numericZip = zip ? parseInt(unmask(zip), 10) : null;
+            const cleanedCpf = unmask(cpf);
+            const cleanedPhone = unmask(phone);
             const numCity = selectedCity ? Number(selectedCity) : null;
 
             console.log('Dados formatados para envio (prestador):', {
@@ -279,7 +279,7 @@ export default function ProviderProfileScreen() {
                     id_cidade: numCity,
                     uf: state,
                 }, { count: 'exact' })
-                .eq('id_prestador', numUserId);
+                .eq('id_prestador', userId);
 
             if (pError) {
                 console.error('Database Update Error:', pError);
@@ -297,15 +297,15 @@ export default function ProviderProfileScreen() {
             const { error: aError } = await supabase
                 .from('acesso')
                 .update({ CPF: cleanedCpf })
-                .eq('login', numUserId);
+                .eq('login', userId);
 
             if (aError) console.warn('Erro ao sincronizar CPF no acesso:', aError);
 
             // 2. Update Services (Always clear and re-insert if needed)
-            await supabase.from('servico_prestador').delete().eq('id_prestador', numUserId);
+            await supabase.from('servico_prestador').delete().eq('id_prestador', userId);
             if (selectedServices.length > 0) {
                 const serviceInserts = selectedServices.map(serviceId => ({
-                    id_prestador: numUserId,
+                    id_prestador: userId,
                     id_servico: Number(serviceId)
                 }));
                 const { error: sError } = await supabase.from('servico_prestador').insert(serviceInserts);
@@ -313,10 +313,10 @@ export default function ProviderProfileScreen() {
             }
 
             // 3. Update Cities of Operation (Always clear and re-insert if needed)
-            await supabase.from('cidade_atuacao').delete().eq('id_prestador', numUserId);
+            await supabase.from('cidade_atuacao').delete().eq('id_prestador', userId);
             if (selectedCities.length > 0) {
                 const cityInserts = selectedCities.map(cityId => ({
-                    id_prestador: numUserId,
+                    id_prestador: userId,
                     id_cidade: Number(cityId)
                 }));
                 const { error: cError = {} as any } = await supabase.from('cidade_atuacao').insert(cityInserts);
@@ -458,10 +458,10 @@ export default function ProviderProfileScreen() {
                     <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
 
                     <Text style={styles.label}>Telefone</Text>
-                    <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+                    <TextInput style={styles.input} value={phone} onChangeText={(text) => setPhone(maskPhone(text))} keyboardType="phone-pad" maxLength={15} />
 
                     <Text style={styles.label}>CPF/CNPJ</Text>
-                    <TextInput style={styles.input} value={cpf} onChangeText={setCpf} keyboardType="numeric" />
+                    <TextInput style={styles.input} value={cpf} onChangeText={(text) => setCpf(maskCpf(text))} keyboardType="numeric" maxLength={14} />
                 </View>
 
                 {/* 4. Services and Cities */}

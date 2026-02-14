@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Briefcase, Calendar, FileText, Mail, MapPin, Phone, Shield, TrendingUp, User } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -10,6 +9,7 @@ import { Palette } from '../constants/theme';
 import { supabase } from '../lib/supabase';
 
 import { fetchAddressByCep } from '../lib/address';
+import { maskCpf, maskPhone, unmask } from '../lib/masks';
 
 export default function SignupPrestadorScreen() {
     const router = useRouter();
@@ -124,10 +124,11 @@ export default function SignupPrestadorScreen() {
 
         try {
             // 0. Verify CPF Uniqueness
+            const cleanedCpf = unmask(cpf);
             const { data: existingAcesso, error: cpfCheckError } = await supabase
                 .from('acesso')
                 .select('login')
-                .eq('CPF', cpf)
+                .eq('CPF', cleanedCpf)
                 .maybeSingle();
 
             if (cpfCheckError) {
@@ -143,7 +144,7 @@ export default function SignupPrestadorScreen() {
             const { data: acessoData, error: acessoError } = await supabase
                 .from('acesso')
                 .insert({
-                    CPF: cpf,
+                    CPF: cleanedCpf,
                     senha: password,
                     tipo_login: 'prestador'
                 })
@@ -153,7 +154,7 @@ export default function SignupPrestadorScreen() {
             if (acessoError) throw new Error(`Erro no acesso: ${acessoError.message} `);
             if (!acessoData?.login) throw new Error('Falha ao gerar ID de login.');
 
-            const loginId = acessoData.login;
+            const loginId = acessoData.login; // Keeping as string (UUID)
 
             // 2. Insert into 'prestador' table
             const { error: prestadorError } = await supabase
@@ -161,13 +162,13 @@ export default function SignupPrestadorScreen() {
                 .insert({
                     id_prestador: loginId,
                     nome: name,
-                    cpf_cnpj: cpf,
-                    fone1: phone,
+                    cpf_cnpj: cleanedCpf,
+                    fone1: unmask(phone),
                     email: email,
                     logradouro: street,
                     num_logradouro: number,
                     bairro: district,
-                    cep: zip,
+                    cep: unmask(zip),
                     id_cidade: selectedCity ? Number(selectedCity) : null,
                 });
 
@@ -180,6 +181,7 @@ export default function SignupPrestadorScreen() {
                     id_servico: Number(serviceId)
                 }));
 
+                console.log('Inserting services:', serviceInserts);
                 const { error: servicoError } = await supabase
                     .from('servico_prestador')
                     .insert(serviceInserts);
@@ -194,6 +196,7 @@ export default function SignupPrestadorScreen() {
                     id_cidade: Number(cityId)
                 }));
 
+                console.log('Inserting operating cities:', cityInserts);
                 const { error: cityError } = await supabase
                     .from('cidade_atuacao')
                     .insert(cityInserts);
@@ -201,16 +204,25 @@ export default function SignupPrestadorScreen() {
                 if (cityError) throw new Error(`Erro ao vincular cidades de atuação: ${cityError.message} `);
             }
 
-            // Save session ID for auto-login behavior
-            await AsyncStorage.setItem('user_id', String(loginId));
-            await AsyncStorage.setItem('user_type', 'prestador');
+            // Removed auto-login logic to allow manual login after signup
+            // await AsyncStorage.setItem('user_id', String(loginId));
+            // await AsyncStorage.setItem('user_type', 'prestador');
 
-            Alert.alert('Sucesso!', 'Cadastro realizado com sucesso.');
-            router.replace('/(provider)/profile');
+            if (Platform.OS === 'web') {
+                alert('Cadastro realizado com sucesso. Faça login para continuar.');
+                router.replace('/');
+            } else {
+                Alert.alert(
+                    'Sucesso!',
+                    'Cadastro realizado com sucesso. Faça login para continuar.',
+                    [{ text: 'OK', onPress: () => router.replace('/') }]
+                );
+            }
 
         } catch (error: any) {
-            Alert.alert('Erro no cadastro', error.message);
-            console.error(error);
+            console.error('Signup Error:', error);
+            const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+            Alert.alert('Erro no cadastro', errorMessage);
         } finally {
             setLoading(false);
         }
@@ -309,9 +321,10 @@ export default function SignupPrestadorScreen() {
                                     style={styles.input}
                                     placeholder="Telefone"
                                     value={phone}
-                                    onChangeText={setPhone}
+                                    onChangeText={(text) => setPhone(maskPhone(text))}
                                     keyboardType="phone-pad"
                                     placeholderTextColor={Palette.textPlaceholder}
+                                    maxLength={15}
                                 />
                             </View>
 
@@ -323,9 +336,10 @@ export default function SignupPrestadorScreen() {
                                     style={styles.input}
                                     placeholder="CPF"
                                     value={cpf}
-                                    onChangeText={setCpf}
+                                    onChangeText={(text) => setCpf(maskCpf(text))}
                                     keyboardType="numeric"
                                     placeholderTextColor={Palette.textPlaceholder}
+                                    maxLength={14}
                                 />
                             </View>
 

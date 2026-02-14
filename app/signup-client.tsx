@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, CheckCircle, FileText, Mail, MapPin, Phone, User } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -10,6 +9,7 @@ import { Palette } from '../constants/theme';
 import { supabase } from '../lib/supabase';
 
 import { fetchAddressByCep } from '../lib/address';
+import { maskCpf, maskPhone, unmask } from '../lib/masks';
 
 export default function SignupClientScreen() {
     const router = useRouter();
@@ -98,78 +98,75 @@ export default function SignupClientScreen() {
         }
 
         // 0. Verify CPF Uniqueness
+        const cleanedCpf = unmask(cpf);
         setLoading(true);
 
-        const { data: existingAcesso, error: cpfCheckError } = await supabase
-            .from('acesso')
-            .select('login')
-            .eq('CPF', cpf)
-            .maybeSingle();
+        try {
+            const { data: existingAcesso, error: cpfCheckError } = await supabase
+                .from('acesso')
+                .select('login')
+                .eq('CPF', cleanedCpf)
+                .maybeSingle();
 
-        if (cpfCheckError) {
-            console.error('Error checking CPF:', cpfCheckError);
-            Alert.alert('Erro', 'Falha ao verificar CPF.');
+            if (cpfCheckError) {
+                console.error('Error checking CPF:', cpfCheckError);
+                throw new Error('Falha ao verificar CPF.');
+            }
+
+            if (existingAcesso) {
+                throw new Error('CPF já cadastrado no sistema.');
+            }
+
+            const { data: acessoData, error: acessoError } = await supabase
+                .from('acesso')
+                .insert({
+                    CPF: cleanedCpf,
+                    senha: password,
+                    tipo_login: 'cliente'
+                })
+                .select('login')
+                .single();
+
+            if (acessoError) throw new Error(`Erro no acesso: ${acessoError.message}`);
+
+            if (!acessoData || !acessoData.login) throw new Error('Falha ao gerar ID de login.');
+
+            const newLoginId = acessoData.login; // Keeping as string (UUID)
+
+            const { error: dbError } = await supabase
+                .from('cliente')
+                .insert({
+                    id_cliente: newLoginId,
+                    nome: name,
+                    cpf_cnpj: cleanedCpf,
+                    fone1: unmask(phone),
+                    email: email,
+                    logradouro: street,
+                    num_logradouro: number,
+                    bairro: district,
+                    cep: unmask(zip),
+                    id_cidade: selectedCity,
+                });
+
+            if (dbError) throw dbError;
+
+            if (Platform.OS === 'web') {
+                alert('Cadastro realizado com sucesso. Faça login para continuar.');
+                router.replace('/');
+            } else {
+                Alert.alert(
+                    'Sucesso!',
+                    'Cadastro realizado com sucesso. Faça login para continuar.',
+                    [{ text: 'OK', onPress: () => router.replace('/') }]
+                );
+            }
+        } catch (error: any) {
+            console.error('Signup Error:', error);
+            const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+            Alert.alert('Erro no cadastro', errorMessage);
+        } finally {
             setLoading(false);
-            return;
         }
-
-        if (existingAcesso) {
-            Alert.alert('Erro', 'CPF já cadastrado no sistema.');
-            setLoading(false);
-            return;
-        }
-
-        const { data: acessoData, error: acessoError } = await supabase
-            .from('acesso')
-            .insert({
-                CPF: cpf,
-                senha: password,
-                tipo_login: 'cliente'
-            })
-            .select('login')
-            .single();
-
-        if (acessoError) {
-            Alert.alert('Erro no cadastro (Acesso)', acessoError.message);
-            setLoading(false);
-            return;
-        }
-
-        if (!acessoData || !acessoData.login) {
-            Alert.alert('Erro', 'Falha ao gerar ID de login.');
-            setLoading(false);
-            return;
-        }
-
-        const newLoginId = acessoData.login;
-
-        const { error: dbError } = await supabase
-            .from('cliente')
-            .insert({
-                id_cliente: newLoginId,
-                nome: name,
-                cpf_cnpj: cpf,
-                fone1: phone,
-                email: email,
-                logradouro: street,
-                num_logradouro: number,
-                bairro: district,
-                cep: zip,
-                id_cidade: selectedCity,
-            });
-
-        if (dbError) {
-            console.warn('DB Insert Error:', dbError);
-            Alert.alert('Cadastro realizado!', `Usuário criado, mas houve um erro ao salvar dados do cliente: ${dbError.message}`);
-        } else {
-            await AsyncStorage.setItem('user_id', String(newLoginId));
-            await AsyncStorage.setItem('user_type', 'cliente');
-
-            Alert.alert('Sucesso!', 'Cadastro realizado com sucesso.');
-            router.replace('/(client)/home');
-        }
-
-        setLoading(false);
     }
 
     const renderLeftPanel = () => (
@@ -265,9 +262,10 @@ export default function SignupClientScreen() {
                                     style={styles.input}
                                     placeholder="Celular"
                                     value={phone}
-                                    onChangeText={setPhone}
+                                    onChangeText={(text) => setPhone(maskPhone(text))}
                                     keyboardType="phone-pad"
                                     placeholderTextColor={Palette.textPlaceholder}
+                                    maxLength={15}
                                 />
                             </View>
 
@@ -279,9 +277,10 @@ export default function SignupClientScreen() {
                                     style={styles.input}
                                     placeholder="CPF"
                                     value={cpf}
-                                    onChangeText={setCpf}
+                                    onChangeText={(text) => setCpf(maskCpf(text))}
                                     keyboardType="numeric"
                                     placeholderTextColor={Palette.textPlaceholder}
+                                    maxLength={14}
                                 />
                             </View>
 
